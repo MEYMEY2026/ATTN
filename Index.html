@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ប្រព័ន្ធស្កែនវត្តមាន</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    /* ... CSS styles (ដូចមុន) ... */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+      margin: 0;
+    }
+    .container {
+      max-width: 480px;
+      width: 100%;
+      background: #fff;
+      border-radius: 28px;
+      padding: 20px 16px 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    h1 { font-size: 22px; font-weight: 700; color: #0b2b4a; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #5e6f88; font-size: 13px; margin-bottom: 16px; border-bottom: 2px solid #e9edf4; padding-bottom: 12px; }
+    .mode-group { display: flex; gap: 10px; margin-bottom: 16px; }
+    .mode-btn {
+      flex: 1; padding: 12px 0; border: none; border-radius: 40px; font-size: 15px; font-weight: 600;
+      color: #fff; cursor: pointer; transition: 0.2s; background: #a0b3c9;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .mode-btn.active { transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .mode-btn-checkin { background: #2b7d4b; }
+    .mode-btn-checkin.active { background: #1e6a3a; box-shadow: 0 0 0 3px #8fcfb0; }
+    .mode-btn-checkout { background: #b13e4b; }
+    .mode-btn-checkout.active { background: #942f3b; box-shadow: 0 0 0 3px #f5b7b0; }
+
+    .scanner-wrapper {
+      position: relative; background: #1e2a36; border-radius: 16px; overflow: hidden;
+      margin-bottom: 12px; aspect-ratio: 1 / 1; max-height: 400px;
+    }
+    #reader { width: 100%; height: 100%; }
+    .scanner-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+      border: 2px solid rgba(255,255,255,0.2); border-radius: 16px;
+      box-shadow: inset 0 0 0 2000px rgba(0,0,0,0.2);
+    }
+    .scanner-overlay::after {
+      content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 180px; height: 180px; border: 2px solid rgba(0,255,200,0.6); border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0,255,200,0.15);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity:0.6; transform:translate(-50%,-50%) scale(1); } 50% { opacity:1; transform:translate(-50%,-50%) scale(1.04); } }
+
+    #status-box {
+      padding: 12px 16px; border-radius: 40px; font-weight: 500; font-size: 14px;
+      text-align: center; margin-bottom: 12px; background: #eef2f7; color: #2c3e50;
+      transition: 0.2s; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap;
+    }
+    #status-box.success { background: #d4edda; color: #0e5e2e; }
+    #status-box.error { background: #f8d7da; color: #842029; }
+    #status-box.info { background: #d1e7ff; color: #084298; }
+    #status-box.processing { background: #fff3cd; color: #856404; }
+
+    .tg-status {
+      font-size: 11px; background: rgba(0,0,0,0.08); padding: 2px 10px; border-radius: 20px; margin-left: 4px; white-space: nowrap;
+    }
+    .tg-status.ok { background: #28a745; color: white; }
+    .tg-status.fail { background: #dc3545; color: white; }
+
+    .spinner {
+      display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,0,0,0.1);
+      border-radius: 50%; border-top: 2px solid #3a6b9b; animation: spin 0.6s linear infinite; margin-right: 6px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .btn-gps {
+      background: #17a2b8;
+      color: white;
+      border: none;
+      border-radius: 40px;
+      padding: 10px 20px;
+      font-weight: 600;
+      margin-top: 8px;
+      cursor: pointer;
+      width: 100%;
+      font-size: 14px;
+    }
+    .btn-gps:hover { background: #138496; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📋 ប្រព័ន្ធស្កែនវត្តមាន</h1>
+  <div class="subtitle">CREATE BY SOKVY AT RCAF (BSN)</div>
+  <div class="subtitle">ជ្រើសរបៀប ហើយស្កែនកាតសិស្ស</div>
+  <div class="mode-group">
+    <button id="btn-in" class="mode-btn mode-btn-checkin active" onclick="setScanType('Check-In')">🟢 Check‑In</button>
+    <button id="btn-out" class="mode-btn mode-btn-checkout" onclick="setScanType('Check-Out')">🔴 Check‑Out</button>
+  </div>
+  <div class="scanner-wrapper">
+    <div id="reader"></div>
+    <div class="scanner-overlay"></div>
+  </div>
+  <div id="status-box">📷 កំពុងរៀបចំកាមេរ៉ា...</div>
+  <button class="btn-gps" onclick="testGPS()">📍 សាកល្បង GPS</button>
+</div>
+
+<script>
+  // ─── CONFIG ──────────────────────────────────────────────
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwRduEu-0ahuaLYMXiwNLRwaBAdGqEG8rbDxMRh5HJYE7hQwL4C4t51fkec-M6jXQGPcA/exec"; // ⬅️ ប្តូរទៅ URL របស់អ្នក
+
+  let currentScanType = "Check-In";
+  let html5QrcodeScanner = null;
+  let isProcessing = false;
+  let lastPos = null, lastPosTime = 0;
+  let allowedLocations = [];
+  let defaultMaxDistance = 50;
+
+  const statusBox = document.getElementById('status-box');
+  const btnIn = document.getElementById('btn-in');
+  const btnOut = document.getElementById('btn-out');
+
+  // ─── Helpers ──────────────────────────────────────────────
+  function showStatus(msg, type='info', tgBadge=null) {
+    statusBox.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = msg;
+    statusBox.appendChild(span);
+    if (tgBadge) {
+      const badge = document.createElement('span');
+      badge.className = 'tg-status ' + (tgBadge.ok ? 'ok' : 'fail');
+      badge.textContent = tgBadge.ok ? '📨 OK' : '❌ Fail';
+      statusBox.appendChild(badge);
+    }
+    statusBox.className = 'status-box ' + type;
+  }
+
+  function showProcessing(msg) {
+    statusBox.innerHTML = `<span class="spinner"></span> ${msg}`;
+    statusBox.className = 'status-box processing';
+  }
+
+  function playBeep() {
+    try {
+      const ctx = new(window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = 980;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.start(); osc.stop(ctx.currentTime + 0.15);
+    } catch(_) {}
+  }
+
+  function calcDistance(lat1,lng1,lat2,lng2) {
+    const R = 6371e3;
+    const p1 = lat1*Math.PI/180, p2 = lat2*Math.PI/180;
+    const dP = (lat2-lat1)*Math.PI/180, dL = (lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dP/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dL/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // 📍 ទាញយកបញ្ជីទីតាំងពី Backend
+  async function fetchLocations() {
+    try {
+      const resp = await fetch(WEB_APP_URL + '?getLocations=true');
+      const data = await resp.json();
+      if (data.status === 'success') {
+        allowedLocations = data.locations || [];
+        defaultMaxDistance = data.defaultMaxDistance || 50;
+        console.log('✅ Locations loaded:', allowedLocations);
+        return true;
+      } else {
+        console.error('❌ Failed to load locations:', data);
+        return false;
+      }
+    } catch (e) {
+      console.error('❌ Fetch error:', e);
+      return false;
+    }
+  }
+
+  // 📍 ពិនិត្យស្ថានភាពសិទ្ធិ GPS
+  async function checkGPSSupport() {
+    if (!navigator.geolocation) {
+      showStatus('❌ Browser មិនគាំទ្រ GPS', 'error');
+      return false;
+    }
+    // ពិនិត្យសិទ្ធិបើអាច
+    if (navigator.permissions) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        if (result.state === 'denied') {
+          showStatus('❌ សិទ្ធិ GPS ត្រូវបានបដិសេធ។ សូមអនុញ្ញាតក្នុងការកំណត់ Browser', 'error');
+          return false;
+        } else if (result.state === 'prompt') {
+          showStatus('⏳ សូមអនុញ្ញាតសិទ្ធិ GPS នៅពេល Browser សួរ', 'info');
+          // យើងនៅតែបន្ត ព្រោះអាចសួរបាន
+        } else if (result.state === 'granted') {
+          // OK
+        }
+      } catch (e) {}
+    }
+    return true;
+  }
+
+  // 📍 សាកល្បង GPS (ប៊ូតុង)
+  function testGPS() {
+    showStatus('⏳ កំពុងស្វែងរក GPS...', 'processing');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        showStatus(`✅ GPS ដំណើរការ! (${lat.toFixed(6)}, ${lng.toFixed(6)})`, 'success');
+        lastPos = pos;
+        lastPosTime = Date.now();
+      },
+      (err) => {
+        let msg = '❌ GPS បរាជ័យ: ';
+        if (err.code === 1) msg += 'អ្នកបានបដិសេធសិទ្ធិ។ សូមអនុញ្ញាតក្នុងការកំណត់ Browser។';
+        else if (err.code === 2) msg += 'សញ្ញា GPS មិនអាចរកឃើញ។ សូមចេញទៅកន្លែងបើកចំហ។';
+        else if (err.code === 3) msg += 'ការស្វែងរក GPS អស់ពេល។ សូមសាកល្បងម្ដងទៀត។';
+        else msg += err.message;
+        showStatus(msg, 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  // 📍 ទាញយកទីតាំង (ជាមួយការពិនិត្យសិទ្ធិ)
+  function getPosition() {
+    return new Promise((resolve, reject) => {
+      const now = Date.now();
+      if (lastPos && (now - lastPosTime) < 30000) {
+        resolve(lastPos);
+        return;
+      }
+      // ពិនិត្យសិទ្ធិមុន
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          lastPos = p;
+          lastPosTime = Date.now();
+          resolve(p);
+        },
+        (err) => {
+          // ប្រសិនបើមានកំហុស ប៉ុន្តែមាន cache ចាស់ ប្រើវា
+          if (lastPos) {
+            resolve(lastPos);
+          } else {
+            // បើគ្មានអ្វីទាំងអស់ បដិសេធ
+            reject(err);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    });
+  }
+
+  // ─── Send data ─────────────────────────────────────────────
+  async function sendAttendance(studentId, studentName, lat, lng, locationName, distance) {
+    const payload = {
+      studentId: studentId.trim(),
+      studentName: studentName.trim() || 'សិស្ស',
+      type: currentScanType,
+      lat, lng,
+      distance: distance,
+      locationName: locationName
+    };
+    showProcessing('⏳ កំពុងផ្ញើ...');
+    try {
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+      const text = await resp.text();
+      let data;
+      try { data = JSON.parse(text); } catch(_) { throw new Error(text || 'Server error'); }
+      let msg = '', badge = null;
+      if (data.status === 'success') {
+        const locMsg = data.location ? ` (${data.location})` : '';
+        msg = `✅ [${currentScanType}] ${payload.studentName} (${payload.studentId})${locMsg}`;
+        playBeep();
+        if (data.telegram) {
+          badge = { ok: data.telegram.status === 'success' };
+          msg += badge.ok ? ' 📨 OK' : ` ⚠️ ${data.telegram.message || 'fail'}`;
+        }
+        showStatus(msg, 'success', badge);
+      } else {
+        showStatus(`❌ ${data.message || 'Server error'}`, 'error');
+      }
+    } catch(err) {
+      showStatus(`❌ ${err.message}`, 'error');
+    }
+    setTimeout(() => {
+      isProcessing = false;
+      if (html5QrcodeScanner) html5QrcodeScanner.resume();
+      showStatus(`📷 រង់ចាំស្កែន [${currentScanType}]`, 'info');
+    }, 1500);
+  }
+
+  // ─── QR scan handler ──────────────────────────────────────
+  async function onScanSuccess(decodedText) {
+    if (isProcessing) return;
+    isProcessing = true;
+    if (html5QrcodeScanner) html5QrcodeScanner.pause();
+
+    let id = '', name = 'សិស្ស';
+    try {
+      const obj = JSON.parse(decodedText);
+      id = (obj.id || '').trim();
+      name = (obj.name || '').trim() || name;
+    } catch(_) { id = decodedText.trim(); }
+    if (!id) {
+      showStatus('❌ QR Code គ្មាន ID', 'error');
+      setTimeout(() => { isProcessing = false; if (html5QrcodeScanner) html5QrcodeScanner.resume(); }, 1000);
+      return;
+    }
+    showProcessing('📍 កំពុងពិនិត្យទីតាំង...');
+    try {
+      // ពិនិត្យសិទ្ធិ GPS មុនពេលស្កែន
+      const gpsOk = await checkGPSSupport();
+      if (!gpsOk) {
+        // ប្រសិនបើសិទ្ធិត្រូវបានបដិសេធ បង្ហាញសារហើយបញ្ឈប់
+        setTimeout(() => {
+          isProcessing = false;
+          if (html5QrcodeScanner) html5QrcodeScanner.resume();
+        }, 2000);
+        return;
+      }
+
+      const pos = await getPosition();
+      const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      const nearest = findNearestLocation(lat, lng);
+      
+      if (!nearest) {
+        let minDist = Infinity;
+        for (let loc of allowedLocations) {
+          const d = calcDistance(lat, lng, loc.lat, loc.lng);
+          if (d < minDist) minDist = d;
+        }
+        showStatus(`🚫 ឆ្ងាយពីទីតាំងសាលា (${minDist.toFixed(1)}ម)`, 'error');
+        setTimeout(() => { isProcessing = false; if (html5QrcodeScanner) html5QrcodeScanner.resume(); }, 1500);
+        return;
+      }
+
+      await sendAttendance(id, name, lat, lng, nearest.name, nearest.distance);
+    } catch(err) {
+      // ប្រសិនបើ GPS បរាជ័យ
+      let msg = '⚠️ មិនអាចទាញយក GPS: ';
+      if (err.code === 1) msg += 'អ្នកបានបដិសេធសិទ្ធិ។ សូមអនុញ្ញាតក្នុងការកំណត់ Browser។';
+      else if (err.code === 2) msg += 'សញ្ញា GPS មិនអាចរកឃើញ។ សូមចេញទៅកន្លែងបើកចំហ។';
+      else if (err.code === 3) msg += 'ការស្វែងរក GPS អស់ពេល។';
+      else msg += err.message || 'មិនស្គាល់កំហុស';
+      showStatus(msg, 'error');
+      setTimeout(() => {
+        isProcessing = false;
+        if (html5QrcodeScanner) html5QrcodeScanner.resume();
+      }, 2000);
+    }
+  }
+
+  function onScanFailure() {}
+
+  // ─── Scanner init ──────────────────────────────────────────
+  function initScanner() {
+    if (html5QrcodeScanner) { html5QrcodeScanner.clear(); html5QrcodeScanner = null; }
+    try {
+      html5QrcodeScanner = new Html5QrcodeScanner('reader', { fps: 30, qrbox: { width: 200, height: 200 }, aspectRatio: 1.0 }, false);
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+      showStatus(`📷 រួចរាល់ [${currentScanType}]`, 'info');
+    } catch(e) {
+      showStatus(`❌ កាមេរ៉ា: ${e.message}`, 'error');
+    }
+  }
+
+  // 📍 រកទីតាំងជិតបំផុត (ដូចមុន)
+  function findNearestLocation(lat, lng) {
+    let nearest = null;
+    let minDist = Infinity;
+    for (let loc of allowedLocations) {
+      const dist = calcDistance(lat, lng, loc.lat, loc.lng);
+      const maxDist = loc.maxDistance || defaultMaxDistance;
+      if (dist <= maxDist && dist < minDist) {
+        minDist = dist;
+        nearest = { ...loc, distance: dist };
+      }
+    }
+    return nearest;
+  }
+
+  // ─── Set type ──────────────────────────────────────────────
+  function setScanType(type) {
+    currentScanType = type;
+    btnIn.classList.toggle('active', type === 'Check-In');
+    btnOut.classList.toggle('active', type === 'Check-Out');
+    showStatus(`🔄 ប្តូរទៅ ${type}`, 'info');
+    playBeep();
+    isProcessing = false;
+    if (html5QrcodeScanner) html5QrcodeScanner.resume();
+  }
+  window.setScanType = setScanType;
+  window.testGPS = testGPS;
+
+  // ─── Start ──────────────────────────────────────────────────
+  window.addEventListener('load', async () => {
+    await fetchLocations();
+    initScanner();
+    // សាកល្បង GPS ដោយស្វ័យប្រវត្តិពេលផ្ទុកទំព័រ (ដើម្បីសុំសិទ្ធិ)
+    setTimeout(() => {
+      navigator.geolocation.getCurrentPosition(
+        (p) => { lastPos = p; lastPosTime = Date.now(); },
+        () => {},
+        { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 }
+      );
+    }, 1000);
+    document.addEventListener('click', () => {
+      if (window.AudioContext) {
+        const ctx = new(window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+      }
+    }, { once: true });
+  });
+  window.addEventListener('beforeunload', () => {
+    if (html5QrcodeScanner) { html5QrcodeScanner.clear(); html5QrcodeScanner = null; }
+  });
+</script>
+</body>
+</html>
